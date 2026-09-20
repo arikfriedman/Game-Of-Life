@@ -1,4 +1,4 @@
-const CACHE = "field-notes-v1";
+const CACHE = "field-notes-v3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -22,19 +22,19 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Network-first, and explicitly bypass the browser's own HTTP cache (not
+// just the service-worker cache) so an updated file is never served stale.
 self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const fetchPromise = fetch(event.request)
-        .then((networkResponse) => {
-          if (event.request.method === "GET" && networkResponse.ok) {
-            const clone = networkResponse.clone();
-            caches.open(CACHE).then((cache) => cache.put(event.request, clone));
-          }
-          return networkResponse;
-        })
-        .catch(() => cached);
-      return cached || fetchPromise;
-    })
+    fetch(event.request, { cache: "no-store" })
+      .then((networkResponse) => {
+        if (networkResponse.ok) {
+          const clone = networkResponse.clone();
+          caches.open(CACHE).then((cache) => cache.put(event.request, clone));
+        }
+        return networkResponse;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
