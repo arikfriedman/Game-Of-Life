@@ -1,7 +1,7 @@
 {
   "name": "Field Notes",
   "short_name": "Field Notes",
-  "description": "Daily challenge and evidence log for the fields you want to grow in.",
+  "description": "Daily dares and journal log.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
