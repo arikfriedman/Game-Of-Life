@@ -1,0 +1,65 @@
+name: Send reminders
+
+on:
+  schedule:
+    # Times below are UTC. Converted from Israel time (currently UTC+3,
+    # daylight saving) — see note at the bottom about the winter shift.
+    - cron: "0 5 * * *"    # 8:00am daily — morning routine + today's dares
+    - cron: "0 20 * * *"   # 11:00pm daily — gratitude
+    - cron: "0 8 * * 5"    # 11:00am Friday — weekly work
+    - cron: "0 20 * * 6"   # 11:00pm Saturday — weekly report ready
+  workflow_dispatch: {}     # lets you trigger a test push manually from the Actions tab
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send push notification
+        env:
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}
+          APP_URL: ${{ vars.APP_URL }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          npm install web-push --no-save
+          node -e '
+            const webpush = require("web-push");
+            const schedule = process.env.SCHEDULE || "manual";
+
+            webpush.setVapidDetails(
+              "mailto:example@example.com",
+              process.env.VAPID_PUBLIC_KEY,
+              process.env.VAPID_PRIVATE_KEY
+            );
+
+            const messages = {
+              "0 5 * * *": { title: "Field Notes", body: "Good morning — do your morning routine and check today'\''s dares." },
+              "0 20 * * *": { title: "Field Notes", body: "Evening — time for gratitude." },
+              "0 8 * * 5": { title: "Field Notes", body: "Time for your weekly work — three things you'\''re proud of, and one uncomfortable thing." },
+              "0 20 * * 6": { title: "Field Notes", body: "Your weekly report is ready to read." },
+              "manual": { title: "Field Notes", body: "Test notification — looks like it'\''s working!" },
+            };
+            const msg = messages[schedule] || messages["manual"];
+
+            const subscription = JSON.parse(process.env.PUSH_SUBSCRIPTION);
+            const payload = JSON.stringify({
+              title: msg.title,
+              body: msg.body,
+              url: process.env.APP_URL || "./",
+            });
+
+            webpush.sendNotification(subscription, payload)
+              .then(() => console.log("Sent:", schedule))
+              .catch((err) => {
+                console.error("Failed:", err.statusCode, err.body);
+                process.exit(1);
+              });
+          '
+
+# Note on daylight saving: Israel typically switches back to UTC+2 in late
+# October. When that happens, every time above will fire an hour later than
+# intended (e.g. 8:00am becomes 9:00am) until the cron values are shifted
+# forward by one hour (05 -> 04, 20 -> 19, 08 -> 07). GitHub Actions cron
+# does not adjust for this automatically. Come back and ask to update this
+# file when the clocks change, or edit the "0 5" etc. values yourself.
